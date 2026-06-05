@@ -28,7 +28,7 @@ function isOffWindow() {
     var t = getTurkeyTime();
     var totalMinutes = t.hour * 60 + t.minute;
     var offStart = 0 * 60 + 30;  // 00:30
-    var offEnd = 12 * 60 + 30;   // 12:30
+    var offEnd = 9 * 60 + 0;   // 12:30
     return totalMinutes >= offStart && totalMinutes < offEnd;
 }
 
