@@ -37,7 +37,7 @@ function createBot() {
     botActive = true;
     var lasttime = -1;
     var moving = 0;
-    var connected = 0;
+    var connected = 0; // BAŞLANGIÇTA 0: Sunucu kilidi açılana kadar hareket etmeyecek
     var lastaction;
 
     bot = mineflayer.createBot({ host: host, port: port, username: username, version: version });
@@ -47,24 +47,31 @@ function createBot() {
     });
 
     bot.on('spawn', function () {
-        connected = 1;
+        connected = 0; // Her spawn durumunda hareketi güvenlik için durdur
         
-        // 1. ADIM: Sunucuya ilk girdiğinde anında bu komut çalışır
+        // 1. ADIM: Sunucuya girer girmez anında çalışır
         bot.chat('/register nexaria nexaria');
         
-        // 2. ADIM: Giriş yaptıktan 3 saniye sonra bu komut çalışır
+        // 2. ADIM: 3 saniye sonra çalışır
         setTimeout(function() {
             bot.chat('/register nexaria');
         }, 3000);
         
-        // 3. ADIM: İkinci komuttan 3 saniye sonra (toplamda 6. saniyede) bu komut çalışır
+        // 3. ADIM: 6 saniye sonra login komutu çalışır
         setTimeout(function() {
             bot.chat('/login nexaria');
+            
+            // DÜZELTME: Login komutundan 1 saniye sonra (toplamda 7. saniyede) yürüme motorunu açıyoruz
+            setTimeout(function() {
+                connected = 1;
+                console.log("Giriş tamamlandı, sunucu kilidi açıldı. Bot artık yürüyor!");
+            }, 1000);
+            
         }, 6000);
     });
 
     bot.on('time', function () {
-        if (connected < 1) return;
+        if (connected < 1) return; // Giriş bitmediyse hareket kodlarını tamamen pasif tutar
         if (lasttime < 0) {
             lasttime = bot.time.age;
         } else {
@@ -120,7 +127,6 @@ function checkAndConnect() {
     var timeStr = t.hour + ':' + (t.minute < 10 ? '0' : '') + t.minute;
 
     if (isOffWindow()) {
-        // Kapalı pencere: 00:30 - 12:30
         if (botActive) {
             console.log('[' + timeStr + '] Kapalı saat (00:30-12:30), bot çıkıyor...');
             stopBot();
@@ -128,7 +134,6 @@ function checkAndConnect() {
         return;
     }
 
-    // Açık pencere: bot bağlı değilse ping at
     if (!botActive) {
         pingServer(function(online) {
             if (online) {
@@ -176,4 +181,3 @@ app.post('/api/stop', function(req, res) {
     stopBot();
     res.json({ message: 'Bot durduruldu.' });
 });
-
