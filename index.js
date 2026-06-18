@@ -48,7 +48,19 @@ function createBot() {
 
     bot.on('spawn', function () {
         connected = 1;
-        bot.chat('/login nexaria');
+        
+        // 1. ADIM: Sunucuya ilk girdiğinde anında bu komut çalışır
+        bot.chat('/register nexaria nexaria');
+        
+        // 2. ADIM: Giriş yaptıktan 3 saniye sonra bu komut çalışır
+        setTimeout(function() {
+            bot.chat('/register nexaria');
+        }, 3000);
+        
+        // 3. ADIM: İkinci komuttan 3 saniye sonra (toplamda 6. saniyede) bu komut çalışır
+        setTimeout(function() {
+            bot.chat('/login nexaria');
+        }, 6000);
     });
 
     bot.on('time', function () {
@@ -164,3 +176,4 @@ app.post('/api/stop', function(req, res) {
     stopBot();
     res.json({ message: 'Bot durduruldu.' });
 });
+
