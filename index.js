@@ -1,4 +1,3 @@
-// index.js (Anticheat için en son ve en 'gevşek' versiyon)
 const mineflayer = require('mineflayer');
 const mc = require('minecraft-protocol');
 const fs = require('fs');
@@ -21,24 +20,15 @@ function createBot() {
 
     bot = mineflayer.createBot({ host: host, port: port, username: username, version: version });
 
-    bot.on('spawn', function () {
-        connected = 0;
-        bot.chat('/register nexaria nexaria');
-        setTimeout(() => bot.chat('/login nexaria'), 5000);
-        setTimeout(() => { connected = 1; console.log("Bot aktif."); }, 7000);
-    });
-
-    // DAHA İNSANSI HAREKET: Sabit döngü yerine rastgele zamanlayıcı
+    // HAREKET DÖNGÜSÜ: Bu fonksiyon artık spawn içinden tetiklenecek
     function randomMovement() {
         if (!botActive || connected === 0) return;
 
-        // Rastgele 5 ile 15 saniye arası bekle
         var nextMove = Math.floor(Math.random() * 10000) + 5000;
         
         setTimeout(() => {
-            if (!botActive) return;
+            if (!botActive || connected === 0) return;
             
-            // Rastgele yön ve hareket
             var yaw = (Math.random() * 6) - 3;
             var pitch = (Math.random() * 2) - 1;
             bot.look(yaw, pitch, true);
@@ -49,12 +39,23 @@ function createBot() {
             bot.setControlState(action, true);
             setTimeout(() => {
                 bot.setControlState(action, false);
-                randomMovement(); // Döngüyü sürdür
-            }, 1000); // 1 saniye yürü ve dur
+                randomMovement(); // Döngü devam etsin
+            }, 1000);
         }, nextMove);
     }
 
-    randomMovement();
+    bot.on('spawn', function () {
+        connected = 0;
+        bot.chat('/register nexaria nexaria');
+        setTimeout(() => bot.chat('/login nexaria'), 5000);
+        
+        // GİRİŞ TAMAMLANDIĞINDA HAREKETİ BAŞLAT
+        setTimeout(() => { 
+            connected = 1; 
+            console.log("Bot giriş yaptı ve hareket etmeye başladı!");
+            randomMovement(); // <-- HAREKET BURADA BAŞLIYOR
+        }, 7000);
+    });
 
     bot.on('end', () => { botActive = false; connected = 0; setTimeout(checkAndConnect, 5000); });
 }
@@ -69,4 +70,3 @@ function checkAndConnect() {
 
 checkAndConnect();
 setInterval(checkAndConnect, 60000);
-
