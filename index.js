@@ -4,7 +4,6 @@ const fs = require('fs');
 const { keep_alive, app } = require("./keep_alive");
 keep_alive();
 
-// Config dosyasını oku
 let rawdata = fs.readFileSync('config.json');
 let data = JSON.parse(rawdata);
 
@@ -19,36 +18,68 @@ function createBot() {
     if (botActive) return;
     botActive = true;
     var connected = 0;
+    var movementTimeout = null;
 
     bot = mineflayer.createBot({ host: host, port: port, username: username, version: version });
 
-    // Hareket döngüsünü başlatan fonksiyon
+    function stopAllMovement() {
+        ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint'].forEach(ctrl => {
+            try { bot.setControlState(ctrl, false); } catch(e) {}
+        });
+    }
+
     function randomMovement() {
         if (!botActive || connected === 0) return;
 
-        // 5 ile 15 saniye arasında rastgele bekle
-        var nextMove = Math.floor(Math.random() * 10000) + 5000;
-        
-        setTimeout(() => {
+        // 8-20 saniye arası bekle (daha insani aralık)
+        var waitTime = Math.floor(Math.random() * 12000) + 8000;
+
+        movementTimeout = setTimeout(() => {
             if (!botActive || connected === 0) return;
-            
-            // Rastgele yön ve bakış
-            var yaw = (Math.random() * 6) - 3;
-            var pitch = (Math.random() * 2) - 1;
-            bot.look(yaw, pitch, true);
-            
-            // Rastgele hareket
-            var actions = ['forward', 'back', 'left', 'right'];
+
+            // Yumuşak bakış açısı değişimi
+            var currentYaw = bot.entity.yaw;
+            var currentPitch = bot.entity.pitch;
+            var targetYaw = currentYaw + (Math.random() * 1.5) - 0.75;  // küçük açı değişimi
+            var targetPitch = (Math.random() * 0.6) - 0.3;
+
+            bot.look(targetYaw, targetPitch, false); // false = smooth look
+
+            // %30 ihtimalle hiç hareket etme (sadece bak)
+            if (Math.random() < 0.3) {
+                randomMovement();
+                return;
+            }
+
+            // Hareket süresi: 1.5-4 saniye arası (daha doğal)
+            var moveDuration = Math.floor(Math.random() * 2500) + 1500;
+
+            var actions = ['forward', 'forward', 'forward', 'back', 'left', 'right'];
+            // forward ağırlıklı (gerçek oyuncular çoğunlukla ileri gider)
             var action = actions[Math.floor(Math.random() * actions.length)];
-            
+
+            // %40 ihtimalle sprint ekle
+            var willSprint = Math.random() < 0.4;
+            if (action === 'forward' && willSprint) {
+                bot.setControlState('sprint', true);
+            }
+
             bot.setControlState(action, true);
-            
-            // 1 saniye yürü ve dur
-            setTimeout(() => {
-                bot.setControlState(action, false);
-                randomMovement(); // Döngüyü tekrarla
-            }, 1000);
-        }, nextMove);
+
+            // Hareket sırasında ara ara yön değiştir (gerçekçi görünüm)
+            var midLookTimeout = setTimeout(() => {
+                if (!botActive || connected === 0) return;
+                var midYaw = targetYaw + (Math.random() * 0.4) - 0.2;
+                bot.look(midYaw, targetPitch, false);
+            }, moveDuration / 2);
+
+            movementTimeout = setTimeout(() => {
+                clearTimeout(midLookTimeout);
+                stopAllMovement();
+                randomMovement();
+            }, moveDuration);
+
+        }, waitTime);
     }
 
     bot.on('login', function () {
@@ -58,18 +89,17 @@ function createBot() {
     bot.on('spawn', function () {
         connected = 0;
         console.log("Spawn olundu, kayıt/giriş yapılıyor...");
-        
+
         bot.chat('/register nexaria nexaria');
-        
+
         setTimeout(() => {
             bot.chat('/login nexaria');
         }, 5000);
-        
-        // 7 saniye sonra hareketleri başlat
-        setTimeout(() => { 
-            connected = 1; 
+
+        setTimeout(() => {
+            connected = 1;
             console.log("Giriş başarılı, hareketler başlatıldı!");
-            randomMovement(); // <-- Hareket döngüsü burada tetikleniyor
+            randomMovement();
         }, 7000);
     });
 
@@ -77,11 +107,13 @@ function createBot() {
         console.log('Hata oluştu:', err.message);
     });
 
-    bot.on('end', () => { 
-        botActive = false; 
-        connected = 0; 
+    bot.on('end', () => {
+        botActive = false;
+        connected = 0;
+        if (movementTimeout) clearTimeout(movementTimeout);
+        stopAllMovement();
         console.log("Bot düştü, 5 saniye sonra tekrar bağlanıyor...");
-        setTimeout(checkAndConnect, 5000); 
+        setTimeout(checkAndConnect, 5000);
     });
 }
 
@@ -94,12 +126,9 @@ function checkAndConnect() {
     }
 }
 
-// Başlangıç kontrolü
 checkAndConnect();
-// Her dakika sunucu kontrolü
 setInterval(checkAndConnect, 60000);
 
-// API endpointleri (Railway için)
 app.get('/api/status', (req, res) => res.json({ active: botActive }));
 app.post('/api/start', (req, res) => { if (!botActive) { createBot(); res.json({ message: 'Başlatıldı' }); } else { res.json({ message: 'Zaten aktif' }); } });
 app.post('/api/stop', (req, res) => { if(bot) { bot.quit(); botActive = false; res.json({ message: 'Durduruldu' }); } else { res.json({ message: 'Bot yok' }); } });
