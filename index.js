@@ -20,7 +20,24 @@ function createBot() {
     var connected = 0;
     var movementTimeout = null;
 
-    bot = mineflayer.createBot({ host: host, port: port, username: username, version: version });
+    bot = mineflayer.createBot({ 
+        host: host, 
+        port: port, 
+        username: username, 
+        version: version,
+        physicsEnabled: true
+    });
+
+    // Grim için physics patch - her tick'te onGround'u zorla
+    function applyGroundPatch() {
+        if (!bot || !bot.entity) return;
+        if (bot.entity.velocity.y === 0 || bot.entity.onGround) {
+            bot.entity.onGround = true;
+            bot.entity.velocity.x = 0;
+            bot.entity.velocity.y = 0;
+            bot.entity.velocity.z = 0;
+        }
+    }
 
     function stopAllMovement() {
         ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint'].forEach(ctrl => {
@@ -31,46 +48,35 @@ function createBot() {
     function randomMovement() {
         if (!botActive || connected === 0) return;
 
-        // 8-20 saniye arası bekle (daha insani aralık)
         var waitTime = Math.floor(Math.random() * 12000) + 8000;
 
         movementTimeout = setTimeout(() => {
             if (!botActive || connected === 0) return;
 
-            // Yumuşak bakış açısı değişimi
             var currentYaw = bot.entity.yaw;
-            var currentPitch = bot.entity.pitch;
-            var targetYaw = currentYaw + (Math.random() * 1.5) - 0.75;  // küçük açı değişimi
+            var targetYaw = currentYaw + (Math.random() * 1.5) - 0.75;
             var targetPitch = (Math.random() * 0.6) - 0.3;
 
-            bot.look(targetYaw, targetPitch, false); // false = smooth look
+            bot.look(targetYaw, targetPitch, false);
 
-            // %30 ihtimalle hiç hareket etme (sadece bak)
             if (Math.random() < 0.3) {
                 randomMovement();
                 return;
             }
 
-            // Hareket süresi: 1.5-4 saniye arası (daha doğal)
             var moveDuration = Math.floor(Math.random() * 2500) + 1500;
-
             var actions = ['forward', 'forward', 'forward', 'back', 'left', 'right'];
-            // forward ağırlıklı (gerçek oyuncular çoğunlukla ileri gider)
             var action = actions[Math.floor(Math.random() * actions.length)];
 
-            // %40 ihtimalle sprint ekle
-            var willSprint = Math.random() < 0.4;
-            if (action === 'forward' && willSprint) {
+            if (action === 'forward' && Math.random() < 0.4) {
                 bot.setControlState('sprint', true);
             }
 
             bot.setControlState(action, true);
 
-            // Hareket sırasında ara ara yön değiştir (gerçekçi görünüm)
             var midLookTimeout = setTimeout(() => {
                 if (!botActive || connected === 0) return;
-                var midYaw = targetYaw + (Math.random() * 0.4) - 0.2;
-                bot.look(midYaw, targetPitch, false);
+                bot.look(targetYaw + (Math.random() * 0.4) - 0.2, targetPitch, false);
             }, moveDuration / 2);
 
             movementTimeout = setTimeout(() => {
@@ -82,6 +88,18 @@ function createBot() {
         }, waitTime);
     }
 
+    function waitForGround() {
+        if (!bot || !bot.entity) return;
+        applyGroundPatch();
+        if (bot.entity.onGround) {
+            connected = 1;
+            console.log("Yerde, hareketler başlatıldı!");
+            randomMovement();
+        } else {
+            setTimeout(waitForGround, 500);
+        }
+    }
+
     bot.on('login', function () {
         console.log("Sunucuya giriş yapıldı.");
     });
@@ -90,17 +108,25 @@ function createBot() {
         connected = 0;
         console.log("Spawn olundu, kayıt/giriş yapılıyor...");
 
+        // Velocity sıfırla
+        bot.entity.velocity.x = 0;
+        bot.entity.velocity.y = 0;
+        bot.entity.velocity.z = 0;
+        bot.entity.onGround = true;
+
         bot.chat('/register nexaria nexaria');
 
         setTimeout(() => {
             bot.chat('/login nexaria');
         }, 5000);
 
-        setTimeout(() => {
-            connected = 1;
-            console.log("Giriş başarılı, hareketler başlatıldı!");
-            randomMovement();
-        }, 7000);
+        setTimeout(waitForGround, 7000);
+    });
+
+    // Her physics tick'te ground patch uygula
+    bot.on('physicsTick', function () {
+        if (connected === 0) return;
+        applyGroundPatch();
     });
 
     bot.on('error', function (err) {
