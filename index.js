@@ -4,12 +4,10 @@ const fs = require('fs');
 const { keep_alive, app } = require("./keep_alive");
 keep_alive();
 
+// Config dosyasını oku
 let rawdata = fs.readFileSync('config.json');
 let data = JSON.parse(rawdata);
-var pi = 3.14159;
-var moveinterval = 2;
-var maxrandom = 5;
-var actions = ['forward', 'back', 'left', 'right'];
+
 var host = data["ip"];
 var port = parseInt(data["port"]) || 25565;
 var username = data["name"];
@@ -17,150 +15,91 @@ var version = data["version"] || "1.20.1";
 var botActive = false;
 var bot;
 
-// Türkiye saati (UTC+3)
-function getTurkeyTime() {
-    var now = new Date(Date.now() + 3 * 60 * 60000);
-    return { hour: now.getUTCHours(), minute: now.getUTCMinutes() };
-}
-
-// 00:30 - 12:30 arası bot kapalı olmalı
-function isOffWindow() {
-    var t = getTurkeyTime();
-    var totalMinutes = t.hour * 60 + t.minute;
-    var offStart = 0 * 60 + 30;  // 00:30
-    var offEnd = 9 * 60 + 0;   // 12:30
-    return totalMinutes >= offStart && totalMinutes < offEnd;
-}
-
 function createBot() {
     if (botActive) return;
     botActive = true;
-    var lasttime = -1;
-    var moving = 0;
     var connected = 0;
-    var lastaction;
 
     bot = mineflayer.createBot({ host: host, port: port, username: username, version: version });
 
+    // Hareket döngüsünü başlatan fonksiyon
+    function randomMovement() {
+        if (!botActive || connected === 0) return;
+
+        // 5 ile 15 saniye arasında rastgele bekle
+        var nextMove = Math.floor(Math.random() * 10000) + 5000;
+        
+        setTimeout(() => {
+            if (!botActive || connected === 0) return;
+            
+            // Rastgele yön ve bakış
+            var yaw = (Math.random() * 6) - 3;
+            var pitch = (Math.random() * 2) - 1;
+            bot.look(yaw, pitch, true);
+            
+            // Rastgele hareket
+            var actions = ['forward', 'back', 'left', 'right'];
+            var action = actions[Math.floor(Math.random() * actions.length)];
+            
+            bot.setControlState(action, true);
+            
+            // 1 saniye yürü ve dur
+            setTimeout(() => {
+                bot.setControlState(action, false);
+                randomMovement(); // Döngüyü tekrarla
+            }, 1000);
+        }, nextMove);
+    }
+
     bot.on('login', function () {
-        console.log("Logged In");
+        console.log("Sunucuya giriş yapıldı.");
     });
 
     bot.on('spawn', function () {
-        connected = 1;
-        bot.chat('/login nexaria');
-    });
-
-    bot.on('time', function () {
-        if (connected < 1) return;
-        if (lasttime < 0) {
-            lasttime = bot.time.age;
-        } else {
-            var randomadd = Math.random() * maxrandom * 20;
-            var interval = moveinterval * 20 + randomadd;
-            if (bot.time.age - lasttime > interval) {
-                if (moving == 1) {
-                    bot.setControlState(lastaction, false);
-                    moving = 0;
-                    lasttime = bot.time.age;
-                } else {
-                    var yaw = Math.random() * pi - (0.5 * pi);
-                    var pitch = Math.random() * pi - (0.5 * pi);
-                    bot.look(yaw, pitch, false);
-                    lastaction = actions[Math.floor(Math.random() * actions.length)];
-                    bot.setControlState(lastaction, true);
-                    moving = 1;
-                    lasttime = bot.time.age;
-                    bot.activateItem();
-                }
-            }
-        }
+        connected = 0;
+        console.log("Spawn olundu, kayıt/giriş yapılıyor...");
+        
+        bot.chat('/register nexaria nexaria');
+        
+        setTimeout(() => {
+            bot.chat('/login nexaria');
+        }, 5000);
+        
+        // 7 saniye sonra hareketleri başlat
+        setTimeout(() => { 
+            connected = 1; 
+            console.log("Giriş başarılı, hareketler başlatıldı!");
+            randomMovement(); // <-- Hareket döngüsü burada tetikleniyor
+        }, 7000);
     });
 
     bot.on('error', function (err) {
-        console.log('Bot error:', err.message);
+        console.log('Hata oluştu:', err.message);
     });
 
-    bot.on('end', function () {
-        botActive = false;
-        connected = 0;
-        console.log('Bot ayrıldı. Hemen tekrar kontrol ediliyor...');
-        setTimeout(checkAndConnect, 5000);
-    });
-}
-
-function stopBot() {
-    if (!botActive) return;
-    console.log('Bot durduruluyor...');
-    try { bot.quit(); } catch (e) {}
-    botActive = false;
-}
-
-function pingServer(callback) {
-    mc.ping({ host: host, port: port, closeTimeout: 8000 }, function(err, result) {
-        callback(!err);
+    bot.on('end', () => { 
+        botActive = false; 
+        connected = 0; 
+        console.log("Bot düştü, 5 saniye sonra tekrar bağlanıyor...");
+        setTimeout(checkAndConnect, 5000); 
     });
 }
 
-// Her 1 dakikada sunucuyu kontrol et
 function checkAndConnect() {
-    var t = getTurkeyTime();
-    var timeStr = t.hour + ':' + (t.minute < 10 ? '0' : '') + t.minute;
-
-    if (isOffWindow()) {
-        // Kapalı pencere: 00:30 - 12:30
-        if (botActive) {
-            console.log('[' + timeStr + '] Kapalı saat (00:30-12:30), bot çıkıyor...');
-            stopBot();
-        }
-        return;
-    }
-
-    // Açık pencere: bot bağlı değilse ping at
     if (!botActive) {
-        pingServer(function(online) {
-            if (online) {
-                console.log('[' + timeStr + '] Sunucu açık! Bot bağlanıyor...');
-                createBot();
-            } else {
-                console.log('[' + timeStr + '] Sunucu kapalı, 1 dk sonra tekrar kontrol.');
-            }
+        mc.ping({ host: host, port: port, closeTimeout: 8000 }, (err) => {
+            if (!err) createBot();
+            else console.log("Sunucu kapalı, bekleniyor...");
         });
     }
 }
 
-// Başlangıçta hemen kontrol et
+// Başlangıç kontrolü
 checkAndConnect();
+// Her dakika sunucu kontrolü
+setInterval(checkAndConnect, 60000);
 
-// Her 1 dakikada bir kontrol et
-setInterval(checkAndConnect, 60 * 1000);
-
-// API endpoint'leri
-app.get('/api/status', function(req, res) {
-    res.json({ active: botActive });
-});
-
-app.post('/api/start', function(req, res) {
-    if (botActive) {
-        return res.json({ message: 'Bot zaten aktif!' });
-    }
-    if (isOffWindow()) {
-        return res.json({ message: 'Kapalı saat (00:30-12:30), başlatılamaz.' });
-    }
-    pingServer(function(online) {
-        if (online) {
-            createBot();
-            res.json({ message: 'Bot başlatıldı!' });
-        } else {
-            res.json({ message: 'Sunucu kapalı, bot bağlanamıyor.' });
-        }
-    });
-});
-
-app.post('/api/stop', function(req, res) {
-    if (!botActive) {
-        return res.json({ message: 'Bot zaten kapalı!' });
-    }
-    stopBot();
-    res.json({ message: 'Bot durduruldu.' });
-});
+// API endpointleri (Railway için)
+app.get('/api/status', (req, res) => res.json({ active: botActive }));
+app.post('/api/start', (req, res) => { if (!botActive) { createBot(); res.json({ message: 'Başlatıldı' }); } else { res.json({ message: 'Zaten aktif' }); } });
+app.post('/api/stop', (req, res) => { if(bot) { bot.quit(); botActive = false; res.json({ message: 'Durduruldu' }); } else { res.json({ message: 'Bot yok' }); } });
