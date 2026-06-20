@@ -28,17 +28,6 @@ function createBot() {
         physicsEnabled: true
     });
 
-    // Grim için physics patch - her tick'te onGround'u zorla
-    function applyGroundPatch() {
-        if (!bot || !bot.entity) return;
-        if (bot.entity.velocity.y === 0 || bot.entity.onGround) {
-            bot.entity.onGround = true;
-            bot.entity.velocity.x = 0;
-            bot.entity.velocity.y = 0;
-            bot.entity.velocity.z = 0;
-        }
-    }
-
     function stopAllMovement() {
         ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint'].forEach(ctrl => {
             try { bot.setControlState(ctrl, false); } catch(e) {}
@@ -90,7 +79,6 @@ function createBot() {
 
     function waitForGround() {
         if (!bot || !bot.entity) return;
-        applyGroundPatch();
         if (bot.entity.onGround) {
             connected = 1;
             console.log("Yerde, hareketler başlatıldı!");
@@ -108,25 +96,21 @@ function createBot() {
         connected = 0;
         console.log("Spawn olundu, kayıt/giriş yapılıyor...");
 
-        // Velocity sıfırla
-        bot.entity.velocity.x = 0;
-        bot.entity.velocity.y = 0;
-        bot.entity.velocity.z = 0;
-        bot.entity.onGround = true;
-
+        // /register nexaria nexaria
         bot.chat('/register nexaria nexaria');
 
+        // 3 saniye sonra /register nexaria
+        setTimeout(() => {
+            bot.chat('/register nexaria');
+        }, 3000);
+
+        // 6 saniye sonra /login nexaria
         setTimeout(() => {
             bot.chat('/login nexaria');
-        }, 5000);
+        }, 6000);
 
-        setTimeout(waitForGround, 7000);
-    });
-
-    // Her physics tick'te ground patch uygula
-    bot.on('physicsTick', function () {
-        if (connected === 0) return;
-        applyGroundPatch();
+        // 9 saniye sonra hareket başlat
+        setTimeout(waitForGround, 9000);
     });
 
     bot.on('error', function (err) {
