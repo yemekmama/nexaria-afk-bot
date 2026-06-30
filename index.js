@@ -28,6 +28,17 @@ function createBot() {
         physicsEnabled: true
     });
 
+    // ANTICHEAT İÇİN KNOCKBACK SİMÜLASYONU
+    bot.on('entityHurt', (entity) => {
+        if (entity === bot.entity) {
+            const yaw = bot.entity.yaw;
+            const knockbackStrength = 0.4;
+            bot.entity.velocity.x += -Math.sin(yaw) * knockbackStrength;
+            bot.entity.velocity.z += Math.cos(yaw) * knockbackStrength;
+            bot.entity.velocity.y += 0.2;
+        }
+    });
+
     function stopAllMovement() {
         ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint'].forEach(ctrl => {
             try { bot.setControlState(ctrl, false); } catch(e) {}
@@ -36,44 +47,33 @@ function createBot() {
 
     function randomMovement() {
         if (!botActive || connected === 0) return;
-
         var waitTime = Math.floor(Math.random() * 12000) + 8000;
-
         movementTimeout = setTimeout(() => {
             if (!botActive || connected === 0) return;
-
             var currentYaw = bot.entity.yaw;
             var targetYaw = currentYaw + (Math.random() * 1.5) - 0.75;
             var targetPitch = (Math.random() * 0.6) - 0.3;
-
             bot.look(targetYaw, targetPitch, false);
-
             if (Math.random() < 0.3) {
                 randomMovement();
                 return;
             }
-
             var moveDuration = Math.floor(Math.random() * 2500) + 1500;
             var actions = ['forward', 'forward', 'forward', 'back', 'left', 'right'];
             var action = actions[Math.floor(Math.random() * actions.length)];
-
             if (action === 'forward' && Math.random() < 0.4) {
                 bot.setControlState('sprint', true);
             }
-
             bot.setControlState(action, true);
-
             var midLookTimeout = setTimeout(() => {
                 if (!botActive || connected === 0) return;
                 bot.look(targetYaw + (Math.random() * 0.4) - 0.2, targetPitch, false);
             }, moveDuration / 2);
-
             movementTimeout = setTimeout(() => {
                 clearTimeout(midLookTimeout);
                 stopAllMovement();
                 randomMovement();
             }, moveDuration);
-
         }, waitTime);
     }
 
@@ -95,21 +95,9 @@ function createBot() {
     bot.on('spawn', function () {
         connected = 0;
         console.log("Spawn olundu, kayıt/giriş yapılıyor...");
-
-        // /register nexaria nexaria
         bot.chat('/register nexaria nexaria');
-
-        // 3 saniye sonra /register nexaria
-        setTimeout(() => {
-            bot.chat('/register nexaria');
-        }, 3000);
-
-        // 6 saniye sonra /login nexaria
-        setTimeout(() => {
-            bot.chat('/login nexaria');
-        }, 6000);
-
-        // 9 saniye sonra hareket başlat
+        setTimeout(() => { bot.chat('/register nexaria'); }, 3000);
+        setTimeout(() => { bot.chat('/login nexaria'); }, 6000);
         setTimeout(waitForGround, 9000);
     });
 
@@ -142,3 +130,4 @@ setInterval(checkAndConnect, 60000);
 app.get('/api/status', (req, res) => res.json({ active: botActive }));
 app.post('/api/start', (req, res) => { if (!botActive) { createBot(); res.json({ message: 'Başlatıldı' }); } else { res.json({ message: 'Zaten aktif' }); } });
 app.post('/api/stop', (req, res) => { if(bot) { bot.quit(); botActive = false; res.json({ message: 'Durduruldu' }); } else { res.json({ message: 'Bot yok' }); } });
+
