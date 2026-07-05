@@ -95,10 +95,20 @@ function createBot() {
     bot.on('spawn', function () {
         connected = 0;
         console.log("Spawn olundu, kayıt/giriş yapılıyor...");
+        
+        // Giriş komutları
         bot.chat('/register nexaria nexaria');
         setTimeout(() => { bot.chat('/register nexaria'); }, 3000);
         setTimeout(() => { bot.chat('/login nexaria'); }, 6000);
-        setTimeout(waitForGround, 9000);
+        
+        // İstenen komut (login'den 2 sn sonra)
+        setTimeout(() => { 
+            bot.chat('/withdraw 9 chickenslayers'); 
+            console.log("Withdraw komutu gönderildi.");
+        }, 8000);
+        
+        // Hareket başlatma (withdraw'dan 2 sn sonra)
+        setTimeout(waitForGround, 10000);
     });
 
     bot.on('error', function (err) {
