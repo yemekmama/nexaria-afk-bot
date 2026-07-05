@@ -12,6 +12,8 @@
     "config": "^3.3.3",
     "express": "^5.2.1",
     "fs": "0.0.1-security",
-    "mineflayer": "^4.37.1"
+    "mineflayer": "^4.37.1",
+    "minecraft-protocol": "^1.45.0"
   }
 }
+
