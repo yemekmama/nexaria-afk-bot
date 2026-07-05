@@ -1,4 +1,4 @@
-const mineflayer = require('mineflayer');
+Const mineflayer = require('mineflayer');
 const mc = require('minecraft-protocol');
 const fs = require('fs');
 const { keep_alive, app } = require("./keep_alive");
@@ -95,20 +95,10 @@ function createBot() {
     bot.on('spawn', function () {
         connected = 0;
         console.log("Spawn olundu, kayıt/giriş yapılıyor...");
-        
-        // Giriş komutları
         bot.chat('/register nexaria nexaria');
         setTimeout(() => { bot.chat('/register nexaria'); }, 3000);
         setTimeout(() => { bot.chat('/login nexaria'); }, 6000);
-        
-        // İstenen komut (login'den 2 sn sonra)
-        setTimeout(() => { 
-            bot.chat('/withdraw 9 chickenslayers'); 
-            console.log("Withdraw komutu gönderildi.");
-        }, 8000);
-        
-        // Hareket başlatma (withdraw'dan 2 sn sonra)
-        setTimeout(waitForGround, 10000);
+        setTimeout(waitForGround, 9000);
     });
 
     bot.on('error', function (err) {
@@ -140,4 +130,3 @@ setInterval(checkAndConnect, 60000);
 app.get('/api/status', (req, res) => res.json({ active: botActive }));
 app.post('/api/start', (req, res) => { if (!botActive) { createBot(); res.json({ message: 'Başlatıldı' }); } else { res.json({ message: 'Zaten aktif' }); } });
 app.post('/api/stop', (req, res) => { if(bot) { bot.quit(); botActive = false; res.json({ message: 'Durduruldu' }); } else { res.json({ message: 'Bot yok' }); } });
-
