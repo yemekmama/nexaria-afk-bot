@@ -28,7 +28,6 @@ function createBot() {
         physicsEnabled: true
     });
 
-    // ANTICHEAT İÇİN KNOCKBACK SİMÜLASYONU
     bot.on('entityHurt', (entity) => {
         if (entity === bot.entity) {
             const yaw = bot.entity.yaw;
@@ -95,20 +94,10 @@ function createBot() {
     bot.on('spawn', function () {
         connected = 0;
         console.log("Spawn olundu, kayıt/giriş yapılıyor...");
-        
-        // Giriş komutları
         bot.chat('/register nexaria nexaria');
         setTimeout(() => { bot.chat('/register nexaria'); }, 3000);
         setTimeout(() => { bot.chat('/login nexaria'); }, 6000);
-        
-        // İstenen komut (login'den 2 sn sonra)
-        setTimeout(() => { 
-            bot.chat('/withdraw 9 chickenslayers'); 
-            console.log("Withdraw komutu gönderildi.");
-        }, 8000);
-        
-        // Hareket başlatma (withdraw'dan 2 sn sonra)
-        setTimeout(waitForGround, 10000);
+        setTimeout(waitForGround, 9000);
     });
 
     bot.on('error', function (err) {
@@ -137,6 +126,30 @@ function checkAndConnect() {
 checkAndConnect();
 setInterval(checkAndConnect, 60000);
 
-app.get('/api/status', (req, res) => res.json({ active: botActive }));
-app.post('/api/start', (req, res) => { if (!botActive) { createBot(); res.json({ message: 'Başlatıldı' }); } else { res.json({ message: 'Zaten aktif' }); } });
-app.post('/api/stop', (req, res) => { if(bot) { bot.quit(); botActive = false; res.json({ message: 'Durduruldu' }); } else { res.json({ message: 'Bot yok' }); } });
+// API ENDPOINTS (Manuel CORS header eklendi)
+app.get('/api/players', (req, res) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    if (bot && bot.players) {
+        const playerNames = Object.keys(bot.players);
+        res.json({ onlineCount: playerNames.length, players: playerNames });
+    } else {
+        res.json({ onlineCount: 0, players: [] });
+    }
+});
+
+app.get('/api/status', (req, res) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.json({ active: botActive });
+});
+
+app.post('/api/start', (req, res) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    if (!botActive) { createBot(); res.json({ message: 'Başlatıldı' }); } 
+    else { res.json({ message: 'Zaten aktif' }); } 
+});
+
+app.post('/api/stop', (req, res) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    if(bot) { bot.quit(); botActive = false; res.json({ message: 'Durduruldu' }); } 
+    else { res.json({ message: 'Bot yok' }); } 
+});
