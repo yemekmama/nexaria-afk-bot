@@ -1,12 +1,11 @@
 const mineflayer = require('mineflayer');
 const mc = require('minecraft-protocol');
 const fs = require('fs');
-const express = require('express'); // express kütüphanesini dahil ettik
+const express = require('express');
 const { keep_alive, app } = require("./keep_alive");
 
-// ÖNEMLİ: Siteden gelen JSON verilerini okumak için bu satır şart
+// JSON verilerini okumak için gerekli
 app.use(express.json());
-
 keep_alive();
 
 let rawdata = fs.readFileSync('config.json');
@@ -21,19 +20,18 @@ var bot;
 
 // Chat mesajlarını kaydetmek için fonksiyon
 function saveChatMessage(username, message) {
-    fs.readFile('chat.json', 'utf8', (err, data) => {
-        let messages = [];
-        if (!err && data) {
-            try { messages = JSON.parse(data); } catch(e) { messages = []; }
-        }
-        
-        messages.push({ user: username, msg: message });
-        
-        // Sadece son 20 mesajı tut
-        if (messages.length > 20) messages.shift();
-        
-        fs.writeFileSync('chat.json', JSON.stringify(messages));
-    });
+    let messages = [];
+    if (fs.existsSync('chat.json')) {
+        try {
+            const data = fs.readFileSync('chat.json', 'utf8');
+            messages = JSON.parse(data);
+        } catch(e) { messages = []; }
+    }
+    
+    messages.push({ user: username, msg: message });
+    if (messages.length > 20) messages.shift();
+    
+    fs.writeFileSync('chat.json', JSON.stringify(messages));
 }
 
 function createBot() {
@@ -50,7 +48,6 @@ function createBot() {
         physicsEnabled: true
     });
 
-    // Chat mesajlarını dinle ve kaydet
     bot.on('chat', (username, message) => {
         if (username === bot.username) return; 
         console.log(`${username}: ${message}`);
@@ -116,22 +113,17 @@ function createBot() {
         }
     }
 
-    bot.on('login', function () {
-        console.log("Sunucuya giriş yapıldı.");
-    });
-
-    bot.on('spawn', function () {
+    bot.on('login', () => console.log("Sunucuya giriş yapıldı."));
+    
+    bot.on('spawn', () => {
         connected = 0;
-        console.log("Spawn olundu, kayıt/giriş yapılıyor...");
+        console.log("Spawn olundu, giriş yapılıyor...");
         bot.chat('/register nexaria nexaria');
-        setTimeout(() => { bot.chat('/register nexaria'); }, 3000);
-        setTimeout(() => { bot.chat('/login nexaria'); }, 6000);
-        setTimeout(waitForGround, 9000);
+        setTimeout(() => { bot.chat('/login nexaria'); }, 3000);
+        setTimeout(waitForGround, 6000);
     });
 
-    bot.on('error', function (err) {
-        console.log('Hata oluştu:', err.message);
-    });
+    bot.on('error', (err) => console.log('Hata:', err.message));
 
     bot.on('end', () => {
         botActive = false;
@@ -155,15 +147,10 @@ function checkAndConnect() {
 checkAndConnect();
 setInterval(checkAndConnect, 60000);
 
-// API ENDPOINTS
+// API ROUTES
 app.get('/api/players', (req, res) => {
     res.header("Access-Control-Allow-Origin", "*");
-    if (bot && bot.players) {
-        const playerNames = Object.keys(bot.players);
-        res.json({ onlineCount: playerNames.length, players: playerNames });
-    } else {
-        res.json({ onlineCount: 0, players: [] });
-    }
+    res.json(bot && bot.players ? { onlineCount: Object.keys(bot.players).length, players: Object.keys(bot.players) } : { onlineCount: 0, players: [] });
 });
 
 app.get('/api/status', (req, res) => {
@@ -173,13 +160,11 @@ app.get('/api/status', (req, res) => {
 
 app.get('/api/chat', (req, res) => {
     res.header("Access-Control-Allow-Origin", "*");
-    fs.readFile('chat.json', 'utf8', (err, data) => {
-        if (err) return res.json([]);
-        try { res.json(JSON.parse(data)); } catch(e) { res.json([]); }
-    });
+    if (fs.existsSync('chat.json')) {
+        try { res.json(JSON.parse(fs.readFileSync('chat.json', 'utf8'))); } catch(e) { res.json([]); }
+    } else { res.json([]); }
 });
 
-// YENİ: Siteden oyun içine mesaj gönderme
 app.post('/api/send-chat', (req, res) => {
     res.header("Access-Control-Allow-Origin", "*");
     const { message } = req.body;
