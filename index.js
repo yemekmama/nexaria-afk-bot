@@ -1,7 +1,12 @@
 const mineflayer = require('mineflayer');
 const mc = require('minecraft-protocol');
 const fs = require('fs');
+const express = require('express'); // express kütüphanesini dahil ettik
 const { keep_alive, app } = require("./keep_alive");
+
+// ÖNEMLİ: Siteden gelen JSON verilerini okumak için bu satır şart
+app.use(express.json());
+
 keep_alive();
 
 let rawdata = fs.readFileSync('config.json');
@@ -166,13 +171,24 @@ app.get('/api/status', (req, res) => {
     res.json({ active: botActive });
 });
 
-// Chat verisini çekmek için yeni endpoint
 app.get('/api/chat', (req, res) => {
     res.header("Access-Control-Allow-Origin", "*");
     fs.readFile('chat.json', 'utf8', (err, data) => {
         if (err) return res.json([]);
         try { res.json(JSON.parse(data)); } catch(e) { res.json([]); }
     });
+});
+
+// YENİ: Siteden oyun içine mesaj gönderme
+app.post('/api/send-chat', (req, res) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    const { message } = req.body;
+    if (bot && message) {
+        bot.chat(message);
+        res.json({ status: 'Başarılı' });
+    } else {
+        res.status(400).json({ status: 'Hata' });
+    }
 });
 
 app.post('/api/start', (req, res) => {
