@@ -14,6 +14,23 @@ var version = data["version"] || "1.20.1";
 var botActive = false;
 var bot;
 
+// Chat mesajlarını kaydetmek için fonksiyon
+function saveChatMessage(username, message) {
+    fs.readFile('chat.json', 'utf8', (err, data) => {
+        let messages = [];
+        if (!err && data) {
+            try { messages = JSON.parse(data); } catch(e) { messages = []; }
+        }
+        
+        messages.push({ user: username, msg: message });
+        
+        // Sadece son 20 mesajı tut
+        if (messages.length > 20) messages.shift();
+        
+        fs.writeFileSync('chat.json', JSON.stringify(messages));
+    });
+}
+
 function createBot() {
     if (botActive) return;
     botActive = true;
@@ -26,6 +43,13 @@ function createBot() {
         username: username, 
         version: version,
         physicsEnabled: true
+    });
+
+    // Chat mesajlarını dinle ve kaydet
+    bot.on('chat', (username, message) => {
+        if (username === bot.username) return; 
+        console.log(`${username}: ${message}`);
+        saveChatMessage(username, message);
     });
 
     bot.on('entityHurt', (entity) => {
@@ -126,7 +150,7 @@ function checkAndConnect() {
 checkAndConnect();
 setInterval(checkAndConnect, 60000);
 
-// API ENDPOINTS (Manuel CORS header eklendi)
+// API ENDPOINTS
 app.get('/api/players', (req, res) => {
     res.header("Access-Control-Allow-Origin", "*");
     if (bot && bot.players) {
@@ -140,6 +164,15 @@ app.get('/api/players', (req, res) => {
 app.get('/api/status', (req, res) => {
     res.header("Access-Control-Allow-Origin", "*");
     res.json({ active: botActive });
+});
+
+// Chat verisini çekmek için yeni endpoint
+app.get('/api/chat', (req, res) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    fs.readFile('chat.json', 'utf8', (err, data) => {
+        if (err) return res.json([]);
+        try { res.json(JSON.parse(data)); } catch(e) { res.json([]); }
+    });
 });
 
 app.post('/api/start', (req, res) => {
